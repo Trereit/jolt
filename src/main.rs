@@ -38,34 +38,36 @@ enum Command {
 
 fn main() {
     let cli = Cli::parse();
-    match cli.command {
+    if let Err(err) = match cli.command {
         Command::New { name, wasm } => create_project(name, wasm),
         Command::InstallToolchain => install_toolchain(),
         Command::BuildWasm => build_wasm(),
+    } {
+        eprintln!("Error: {:?}", err);
+        std::process::exit(1);
     }
 }
 
-fn create_project(name: String, wasm: bool) {
-    create_folder_structure(&name).expect("could not create directory");
-    create_host_files(&name).expect("file creation failed");
-    create_guest_files(&name).expect("file creation failed");
+fn create_project(name: String, wasm: bool) -> Result<()> {
+    create_folder_structure(&name)?;
+    create_host_files(&name)?;
+    create_guest_files(&name)?;
     if wasm {
-        modify_cargo_toml(&name).expect("Failed to update Cargo.toml");
+        modify_cargo_toml(&name)?;
     }
+    Ok(())
 }
 
-fn install_toolchain() {
-    if let Err(err) = toolchain::install_toolchain() {
-        panic!("toolchain install failed: {}", err);
-    }
+fn install_toolchain() -> Result<()> {
+    toolchain::install_toolchain()?;
     display_welcome();
+    Ok(())
 }
 
 fn create_folder_structure(name: &str) -> Result<()> {
-    fs::create_dir(name)?;
-    fs::create_dir(format!("{}/src", name))?;
+    fs::create_dir_all(format!("{}/src", name))?;
+    fs::create_dir_all(format!("{}/guest/src", name))?;
     fs::create_dir(format!("{}/guest", name))?;
-    fs::create_dir(format!("{}/guest/src", name))?;
 
     Ok(())
 }
@@ -136,26 +138,13 @@ fn display_greeting() {
 
 fn display_sysinfo() {
     let mut sys = System::new_all();
-
     sys.refresh_all();
 
-    println!(
-        "OS:             {}",
-        System::name().unwrap_or("UNKNOWN".to_string())
-    );
-    println!(
-        "version:        {}",
-        System::os_version().unwrap_or("UNKNOWN".to_string())
-    );
-    println!(
-        "Host:           {}",
-        System::host_name().unwrap_or("UNKNOWN".to_string())
-    );
+    println!("OS:             {}", sys.name().unwrap_or("UNKNOWN".to_string()));
+    println!("Version:        {}", sys.os_version().unwrap_or("UNKNOWN".to_string()));
+    println!("Host:           {}", sys.host_name().unwrap_or("UNKNOWN".to_string()));
     println!("CPUs:           {}", sys.cpus().len());
-    println!(
-        "RAM:            {:.2} GB",
-        sys.total_memory() as f64 / 1_000_000_000.0
-    );
+    println!("RAM:            {:.2} GB", sys.total_memory() as f64 / 1_000_000_000.0);
 }
 
 const RUST_TOOLCHAIN: &str = include_str!("../rust-toolchain.toml");
