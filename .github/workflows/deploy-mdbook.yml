@@ -1,55 +1,66 @@
-name: Deploy mdBook to GCS
+name: Deploy mdBook
 
 on:
   push:
     branches:
-      - main 
+      - main
 
 jobs:
   deploy_gcloud:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v2
+        name: Checkout repository
 
-    - id: 'auth'
-      uses: 'google-github-actions/auth@v2'
-      with:
-        credentials_json: '${{ secrets.GCP_SA_KEY}}'
+      - uses: dtolnay/rust-toolchain@stable
+        name: Set up Rust toolchain
 
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-    - name: Setup mdBook
-      uses: peaceiris/actions-mdbook@v1
-      with:
-        mdbook-version: '0.4.10'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
 
-    - name: Install mdbook-katex
-      run: cargo install mdbook-katex
+      - name: Setup mdBook
+        uses: peaceiris/actions-mdbook@v1
+        with:
+          mdbook-version: '0.4.10'
 
-    - run: mdbook build ./book
+      - name: Install mdbook-katex
+        run: cargo install mdbook-katex
 
-    - name: Deploy to Google Cloud Storage
-      run: gsutil -m rsync -d -r ./book/book gs://${{ secrets.GCS_BUCKET_NAME }}
+      - name: Build mdBook
+        run: mdbook build ./book
+
+      - name: Deploy to Google Cloud Storage
+        run: gsutil -m rsync -d -r ./book/book gs://${{ secrets.GCS_BUCKET_NAME }}
 
   deploy_firebase:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        name: Checkout repository
+
       - uses: dtolnay/rust-toolchain@stable
+        name: Set up Rust toolchain
+
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
         with:
           mdbook-version: '0.4.10'
+
       - name: Install mdbook-katex
         run: cargo install mdbook-katex
 
-      - run: mdbook build ./book
+      - name: Build mdBook
+        run: mdbook build ./book
 
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: "${{ secrets.GITHUB_TOKEN }}"
-          firebaseServiceAccount: "${{ secrets.GCP_SA_KEY }}"
-          projectId: "${{ secrets.FIREBASE_PROJECT_ID }}"
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.GCP_SA_KEY }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
           channelId: live
